@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MouseRecorder</RootNamespace>
+    <AssemblyName>MouseRecorder</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <LangVersion>latest</LangVersion>
+    <WarningLevel>4</WarningLevel>
+    <GenerateDependencyFile>true</GenerateDependencyFile>
+  </PropertyGroup>
+
+  <!--
+    Ta maszyna buduje przy pomocy pakietowanego przez Ubuntu (source-build) SDK .NET 8,
+    które nie zawiera Microsoft.NET.Sdk.WindowsDesktop (brak UseWindowsForms). Zamiast
+    tego dolinkowujemy współdzielony framework ręcznie przez FrameworkReference — działa
+    identycznie na docelowej maszynie z pełnym oficjalnym SDK (UseWindowsForms=true też
+    by zadziałało, ale nie jest tu wymagane).
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App" />
+  </ItemGroup>
+
+</Project>
