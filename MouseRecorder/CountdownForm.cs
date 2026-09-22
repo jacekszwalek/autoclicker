@@ -3,7 +3,7 @@ using System.Windows.Forms;
 
 namespace MouseRecorder;
 
-/// <summary>Półprzezroczyste, pełnoekranowe okno z dużym odliczaniem 3-2-1. Nie przechwytuje kliknięć.</summary>
+/// <summary>Semi-transparent, fullscreen window with a large 3-2-1 countdown. Does not capture clicks.</summary>
 public sealed class CountdownForm : Form
 {
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1000 };
@@ -43,7 +43,7 @@ public sealed class CountdownForm : Form
         _timer.Start();
     }
 
-    /// <summary>Anuluje odliczanie bez wywołania CountdownFinished (np. po kliknięciu STOP).</summary>
+    /// <summary>Cancels the countdown without raising CountdownFinished (e.g. after clicking STOP).</summary>
     public void CancelCountdown()
     {
         _timer.Stop();

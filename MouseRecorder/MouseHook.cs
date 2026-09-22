@@ -11,7 +11,7 @@ public sealed class MouseHookEventArgs : EventArgs
     public bool Injected { get; init; }
 }
 
-/// <summary>Globalny low-level hook myszy (WH_MOUSE_LL).</summary>
+/// <summary>Global low-level mouse hook (WH_MOUSE_LL).</summary>
 public sealed class MouseHook : IDisposable
 {
     private Native.LowLevelMouseProc? _proc;
@@ -25,7 +25,7 @@ public sealed class MouseHook : IDisposable
     {
         if (IsInstalled) return;
 
-        // Trzymamy referencję do delegata, żeby GC jej nie zebrał póki hook jest aktywny.
+        // Keep a reference to the delegate so the GC doesn't collect it while the hook is active.
         _proc = HookCallback;
 
         using var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
@@ -37,7 +37,7 @@ public sealed class MouseHook : IDisposable
         {
             int error = Marshal.GetLastWin32Error();
             _proc = null;
-            throw new InvalidOperationException($"Nie udało się zainstalować globalnego hooka myszy (kod błędu {error}).");
+            throw new InvalidOperationException($"Failed to install the global mouse hook (error code {error}).");
         }
     }
 

@@ -7,8 +7,8 @@ using System.Windows.Forms;
 namespace MouseRecorder;
 
 /// <summary>
-/// Pełnoekranowa nakładka wizualizująca odtwarzanie: cała ścieżka, punkty kliknięć i ruchomy marker.
-/// Warstwowe okno (per-pixel alpha) click-through, niewidoczne na pasku zadań, nie przejmuje focusa.
+/// Fullscreen overlay visualizing playback: the full path, click markers and a moving cursor marker.
+/// A layered (per-pixel alpha) click-through window, hidden from the taskbar, never takes focus.
 /// </summary>
 public sealed class OverlayForm : Form
 {

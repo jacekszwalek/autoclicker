@@ -2,7 +2,7 @@ using System.Drawing;
 
 namespace MouseRecorder;
 
-/// <summary>Bieżąca pozycja kursora podczas odtwarzania, bezpieczna wątkowo (aktualizowana z wątku Playera, czytana przez UI overlay).</summary>
+/// <summary>Thread-safe current cursor position during playback (written by the Player thread, read by the UI overlay).</summary>
 public sealed class PlaybackProgress
 {
     private readonly object _lock = new();

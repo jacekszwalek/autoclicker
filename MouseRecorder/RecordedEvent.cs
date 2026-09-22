@@ -15,7 +15,7 @@ public enum MouseEventKind
     WheelHorizontal
 }
 
-/// <summary>Pojedyncze zarejestrowane zdarzenie myszy ze znacznikiem czasu (ms od startu nagrywania).</summary>
+/// <summary>A single recorded mouse event with a timestamp (ms since recording start).</summary>
 public readonly struct RecordedEvent
 {
     public long TimestampMs { get; }
@@ -34,7 +34,7 @@ public readonly struct RecordedEvent
     }
 }
 
-/// <summary>Stan maszyny stanów aplikacji.</summary>
+/// <summary>State of the application's state machine.</summary>
 public enum AppState
 {
     Idle,
@@ -43,7 +43,7 @@ public enum AppState
     Playing
 }
 
-/// <summary>Wynik nagrania: lista zdarzeń oraz pozycja startowa kursora.</summary>
+/// <summary>The result of a recording: a list of events plus the cursor's starting position.</summary>
 public sealed class Recording
 {
     public List<RecordedEvent> Events { get; } = new();

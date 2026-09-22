@@ -3,7 +3,7 @@ using System.Drawing;
 
 namespace MouseRecorder;
 
-/// <summary>Nagrywa ruchy i kliknięcia myszy na podstawie globalnego low-level hooka.</summary>
+/// <summary>Records mouse movement and clicks from the global low-level hook.</summary>
 public sealed class Recorder
 {
     private const int MinMoveDistancePx = 3;
@@ -17,7 +17,7 @@ public sealed class Recorder
     private long _lastSavedTimeMs;
     private bool _hasLastSavedPoint;
 
-    /// <summary>Prostokąt (współrzędne ekranu), w którym zdarzenia są ignorowane (okienko STOP).</summary>
+    /// <summary>Rectangle (screen coordinates) in which events are ignored (the STOP window).</summary>
     public Rectangle ExcludedRegion { get; set; }
 
     public bool IsRecording { get; private set; }
@@ -46,10 +46,37 @@ public sealed class Recorder
         _hook.MouseEvent -= OnMouseEvent;
         _hook.Stop();
 
+        TrimTrailingMoveAfterLastClick();
+
         var recording = new Recording { StartPosition = StartPosition };
         recording.Events.AddRange(_events);
         return recording;
     }
+
+    /// <summary>
+    /// If at least one click (left/right/middle button) happened during the recording, drops any
+    /// movement events between the last click and the STOP click — that trailing movement is just
+    /// the cursor travelling towards STOP and is not meaningful to replay.
+    /// </summary>
+    private void TrimTrailingMoveAfterLastClick()
+    {
+        int lastClickIndex = _events.FindLastIndex(IsClickEvent);
+        if (lastClickIndex < 0) return;
+
+        int firstTrailingIndex = lastClickIndex + 1;
+        if (firstTrailingIndex < _events.Count)
+        {
+            _events.RemoveRange(firstTrailingIndex, _events.Count - firstTrailingIndex);
+        }
+    }
+
+    private static bool IsClickEvent(RecordedEvent e) => e.Kind switch
+    {
+        MouseEventKind.LeftDown or MouseEventKind.LeftUp
+            or MouseEventKind.RightDown or MouseEventKind.RightUp
+            or MouseEventKind.MiddleDown or MouseEventKind.MiddleUp => true,
+        _ => false
+    };
 
     private void OnMouseEvent(object? sender, MouseHookEventArgs e)
     {

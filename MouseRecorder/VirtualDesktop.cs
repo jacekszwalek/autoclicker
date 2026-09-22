@@ -2,7 +2,7 @@ using System.Drawing;
 
 namespace MouseRecorder;
 
-/// <summary>Współrzędne i pomocnicze funkcje dla całego wirtualnego pulpitu (wszystkie monitory).</summary>
+/// <summary>Coordinates and helper functions for the entire virtual desktop (all monitors).</summary>
 public static class VirtualDesktop
 {
     public static Rectangle Bounds
@@ -17,7 +17,7 @@ public static class VirtualDesktop
         }
     }
 
-    /// <summary>Zamienia współrzędne piksela na znormalizowane 0..65535 wymagane przez SendInput (MOUSEEVENTF_ABSOLUTE|VIRTUALDESK).</summary>
+    /// <summary>Converts pixel coordinates to the normalized 0..65535 range required by SendInput (MOUSEEVENTF_ABSOLUTE|VIRTUALDESK).</summary>
     public static (int nx, int ny) ToNormalized(int x, int y)
     {
         var b = Bounds;

@@ -16,7 +16,7 @@ public sealed class MainForm : Form
     private Recording? _recording;
     private AppState _state = AppState.Idle;
 
-    // --- Kontrolki ---
+    // --- Controls ---
     private Button _btnRecord = null!;
     private Button _btnNewRecording = null!;
     private Button _btnPlay = null!;
@@ -46,45 +46,45 @@ public sealed class MainForm : Form
         MaximizeBox = false;
         MinimizeBox = true;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(420, 430);
+        ClientSize = new Size(320, 274);
 
-        _btnRecord = new Button { Text = "Nagrywaj", Location = new Point(20, 20), Size = new Size(180, 36) };
+        _btnRecord = new Button { Text = "Record", Location = new Point(10, 10), Size = new Size(145, 28) };
         _btnRecord.Click += (_, _) => BeginRecordingFlow(discardExisting: false);
 
-        _btnNewRecording = new Button { Text = "Nowe nagranie", Location = new Point(220, 20), Size = new Size(180, 36) };
+        _btnNewRecording = new Button { Text = "New Recording", Location = new Point(165, 10), Size = new Size(145, 28) };
         _btnNewRecording.Click += (_, _) => BeginRecordingFlow(discardExisting: true);
 
-        _btnPlay = new Button { Text = "Odtwórz", Location = new Point(20, 66), Size = new Size(380, 36) };
+        _btnPlay = new Button { Text = "Play", Location = new Point(10, 44), Size = new Size(300, 28) };
         _btnPlay.Click += (_, _) => StartPlayback();
 
-        var speedGroup = new GroupBox { Text = "Prędkość", Location = new Point(20, 116), Size = new Size(380, 56) };
-        _speedX1 = new RadioButton { Text = "x1", Location = new Point(10, 24), AutoSize = true, Checked = true };
-        _speedX2 = new RadioButton { Text = "x2", Location = new Point(80, 24), AutoSize = true };
-        _speedX3 = new RadioButton { Text = "x3", Location = new Point(150, 24), AutoSize = true };
-        _speedX5 = new RadioButton { Text = "x5", Location = new Point(220, 24), AutoSize = true };
-        _speedX10 = new RadioButton { Text = "x10", Location = new Point(290, 24), AutoSize = true };
+        var speedGroup = new GroupBox { Text = "Speed", Location = new Point(10, 78), Size = new Size(300, 44) };
+        _speedX1 = new RadioButton { Text = "x1", Location = new Point(10, 18), AutoSize = true, Checked = true };
+        _speedX2 = new RadioButton { Text = "x2", Location = new Point(65, 18), AutoSize = true };
+        _speedX3 = new RadioButton { Text = "x3", Location = new Point(120, 18), AutoSize = true };
+        _speedX5 = new RadioButton { Text = "x5", Location = new Point(175, 18), AutoSize = true };
+        _speedX10 = new RadioButton { Text = "x10", Location = new Point(230, 18), AutoSize = true };
         speedGroup.Controls.AddRange(new Control[] { _speedX1, _speedX2, _speedX3, _speedX5, _speedX10 });
 
-        var repeatGroup = new GroupBox { Text = "Powtórzenia", Location = new Point(20, 184), Size = new Size(380, 90) };
-        _repeatCountRadio = new RadioButton { Text = "Liczba razy", Location = new Point(10, 26), AutoSize = true, Checked = true };
+        var repeatGroup = new GroupBox { Text = "Repeat", Location = new Point(10, 126), Size = new Size(300, 64) };
+        _repeatCountRadio = new RadioButton { Text = "Count", Location = new Point(10, 18), AutoSize = true, Checked = true };
         _repeatCountRadio.CheckedChanged += (_, _) => _repeatCountValue.Enabled = _repeatCountRadio.Checked && _state != AppState.Playing;
-        _repeatCountValue = new NumericUpDown { Location = new Point(130, 24), Size = new Size(70, 23), Minimum = 1, Maximum = 100000, Value = 1 };
-        _repeatInfiniteRadio = new RadioButton { Text = "W nieskończoność", Location = new Point(10, 56), AutoSize = true };
+        _repeatCountValue = new NumericUpDown { Location = new Point(90, 16), Size = new Size(65, 23), Minimum = 1, Maximum = 100000, Value = 1 };
+        _repeatInfiniteRadio = new RadioButton { Text = "Infinite", Location = new Point(10, 38), AutoSize = true };
         repeatGroup.Controls.AddRange(new Control[] { _repeatCountRadio, _repeatCountValue, _repeatInfiniteRadio });
 
         _lblInfo = new Label
         {
-            Text = "Brak nagrania",
-            Location = new Point(20, 286),
-            Size = new Size(380, 40),
-            Font = new Font(Font.FontFamily, 10f)
+            Text = "No recording",
+            Location = new Point(10, 196),
+            Size = new Size(300, 34),
+            Font = new Font(Font.FontFamily, 9f)
         };
 
         var lblHotkeys = new Label
         {
-            Text = "F8 – odtwórz, F9 – zatrzymaj",
-            Location = new Point(20, 336),
-            Size = new Size(380, 24),
+            Text = "F8 – Play    F9 – Stop",
+            Location = new Point(10, 234),
+            Size = new Size(300, 20),
             ForeColor = Color.DimGray
         };
 
@@ -104,9 +104,9 @@ public sealed class MainForm : Form
         {
             MessageBox.Show(
                 this,
-                $"Nie udało się zarejestrować skrótu/skrótów: {string.Join(", ", failed)}.\n" +
-                "Prawdopodobnie są już używane przez inny program. Odtwarzanie/zatrzymywanie klawiszami F8/F9 może nie działać.",
-                "Błąd rejestracji skrótu klawiszowego",
+                $"Failed to register hotkey(s): {string.Join(", ", failed)}.\n" +
+                "They are probably already in use by another program. Playing/stopping with F8/F9 may not work.",
+                "Hotkey Registration Error",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
         }
@@ -129,7 +129,7 @@ public sealed class MainForm : Form
         base.WndProc(ref m);
     }
 
-    // ----------------- Nagrywanie -----------------
+    // ----------------- Recording -----------------
 
     private void BeginRecordingFlow(bool discardExisting)
     {
@@ -201,7 +201,7 @@ public sealed class MainForm : Form
         }
     }
 
-    // ----------------- Odtwarzanie -----------------
+    // ----------------- Playback -----------------
 
     private void TryStartPlaybackViaHotkey()
     {
@@ -270,7 +270,7 @@ public sealed class MainForm : Form
         return (int)_repeatCountValue.Value;
     }
 
-    // ----------------- Wspólne -----------------
+    // ----------------- Shared -----------------
 
     private void ShowMainForm()
     {
@@ -302,12 +302,12 @@ public sealed class MainForm : Form
 
         if (!hasRecording)
         {
-            _lblInfo.Text = "Brak nagrania";
+            _lblInfo.Text = "No recording";
         }
         else
         {
             var duration = TimeSpan.FromMilliseconds(_recording!.DurationMs);
-            _lblInfo.Text = $"Liczba zdarzeń: {_recording.Events.Count}\nCzas trwania: {duration:mm\\:ss\\.fff}";
+            _lblInfo.Text = $"Events: {_recording.Events.Count}\nDuration: {duration:mm\\:ss\\.fff}";
         }
     }
 

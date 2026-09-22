@@ -3,7 +3,7 @@ using System.Windows.Forms;
 
 namespace MouseRecorder;
 
-/// <summary>Małe czerwone okienko STOP, zawsze na wierzchu, w prawym górnym rogu ekranu głównego.</summary>
+/// <summary>Small red STOP window, always on top, vertically centered on the right edge of the primary screen.</summary>
 public sealed class StopForm : Form
 {
     public event EventHandler? StopClicked;
@@ -18,7 +18,7 @@ public sealed class StopForm : Form
         BackColor = Color.Red;
 
         var primary = Screen.PrimaryScreen!.Bounds;
-        Location = new Point(primary.Right - Width, primary.Top);
+        Location = new Point(primary.Right - Width, primary.Top + (primary.Height - Height) / 2);
 
         var label = new Label
         {

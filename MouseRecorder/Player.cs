@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 
 namespace MouseRecorder;
 
-/// <summary>Odtwarza zarejestrowane zdarzenia myszy przy pomocy SendInput, w osobnym wątku.</summary>
+/// <summary>Replays recorded mouse events using SendInput, on a dedicated thread.</summary>
 public sealed class Player
 {
     public bool IsPlaying { get; private set; }
@@ -14,7 +14,7 @@ public sealed class Player
     private Thread? _thread;
     private Action? _onFinished;
 
-    /// <param name="repeatCount">0 lub mniej = odtwarzanie w nieskończoność.</param>
+    /// <param name="repeatCount">0 or less = play forever.</param>
     public void Play(Recording recording, int speedDivisor, int repeatCount, Action onFinished)
     {
         if (IsPlaying || recording.Events.Count == 0)
@@ -208,7 +208,7 @@ public sealed class Player
         Native.SendInput(1, new[] { input }, Marshal.SizeOf<Native.INPUT>());
     }
 
-    /// <summary>Bezpieczeństwo: puszcza każdy przycisk, który odtwarzanie zostawiło wciśnięty.</summary>
+    /// <summary>Safety: releases any button that playback left pressed down.</summary>
     private static void ReleaseHeld(HashSet<MouseEventKind> pressed)
     {
         if (pressed.Contains(MouseEventKind.LeftDown))

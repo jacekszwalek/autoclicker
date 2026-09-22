@@ -2,10 +2,10 @@ using System.Runtime.InteropServices;
 
 namespace MouseRecorder;
 
-/// <summary>Centralne deklaracje P/Invoke używane przez cały program.</summary>
+/// <summary>Central P/Invoke declarations used throughout the program.</summary>
 internal static class Native
 {
-    // --- Hook myszy (WH_MOUSE_LL) ---
+    // --- Mouse hook (WH_MOUSE_LL) ---
     public const int WH_MOUSE_LL = 14;
 
     public const int WM_MOUSEMOVE = 0x0200;
@@ -101,7 +101,7 @@ internal static class Native
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
-    // --- Metryki systemowe / wirtualny pulpit ---
+    // --- System metrics / virtual desktop ---
     public const int SM_XVIRTUALSCREEN = 76;
     public const int SM_YVIRTUALSCREEN = 77;
     public const int SM_CXVIRTUALSCREEN = 78;
@@ -114,14 +114,14 @@ internal static class Native
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetCursorPos(out POINT lpPoint);
 
-    // --- Precyzyjne odmierzanie czasu ---
+    // --- High-resolution timing ---
     [DllImport("winmm.dll", SetLastError = true)]
     public static extern uint timeBeginPeriod(uint uPeriod);
 
     [DllImport("winmm.dll", SetLastError = true)]
     public static extern uint timeEndPeriod(uint uPeriod);
 
-    // --- Okna warstwowe (click-through overlay) ---
+    // --- Layered windows (click-through overlay) ---
     public const int GWL_EXSTYLE = -20;
     public const int WS_EX_LAYERED = 0x00080000;
     public const int WS_EX_TRANSPARENT = 0x00000020;

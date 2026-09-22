@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace MouseRecorder;
 
-/// <summary>Zarządza globalnymi skrótami klawiszowymi (RegisterHotKey), niezależnie od okna z fokusem.</summary>
+/// <summary>Manages global hotkeys (RegisterHotKey), independent of which window has focus.</summary>
 public sealed class HotkeyManager : IDisposable
 {
     public const int HotkeyIdPlay = 1;
@@ -16,7 +16,7 @@ public sealed class HotkeyManager : IDisposable
         _windowHandle = windowHandle;
     }
 
-    /// <summary>Rejestruje F8 (odtwórz) i F9 (zatrzymaj). Zwraca listę skrótów, których nie udało się zarejestrować.</summary>
+    /// <summary>Registers F8 (play) and F9 (stop). Returns the list of hotkeys that failed to register.</summary>
     public List<string> RegisterAll()
     {
         var failed = new List<string>();
