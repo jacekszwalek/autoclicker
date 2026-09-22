@@ -12,14 +12,14 @@ public sealed class Player
     /// the playback speed. At high speed dividers a click's down/up gap can shrink to just a few ms,
     /// which some apps (browsers in particular) fail to register as a real click.
     /// </summary>
-    private const double MinClickHoldMs = 40.0;
+    private const double MinClickHoldMs = 200.0;
 
     /// <summary>
     /// Minimum real (wall-clock) time since the last SendInput call before a button-down is sent.
     /// Gives the target app's hit-testing/hover state a moment to catch up with the cursor's new
     /// position before the click starts, instead of pressing the instant the cursor arrives.
     /// </summary>
-    private const double MinPreClickSettleMs = 15.0;
+    private const double MinPreClickSettleMs = 200.0;
 
     /// <summary>
     /// Minimum real (wall-clock) spacing between successive SendInput calls during interpolated
@@ -29,6 +29,17 @@ public sealed class Player
     /// cause of clicks being dropped or misrouted intermittently at higher speeds.
     /// </summary>
     private const int MinMoveStepMs = 8;
+
+    /// <summary>
+    /// How long the extra "priming tap" (see below) stays down before its own release.
+    /// </summary>
+    private const int PrimingTapHoldMs = 30;
+
+    /// <summary>
+    /// Real (wall-clock) gap between the priming tap's release and the actual recorded button-down
+    /// that follows it.
+    /// </summary>
+    private const double PrimingToRealClickGapMs = 60.0;
 
     /// <summary>
     /// Real time to wait after the very last input event before handing focus back to our own
@@ -140,8 +151,14 @@ public sealed class Player
                 case MouseEventKind.LeftDown:
                 case MouseEventKind.RightDown:
                 case MouseEventKind.MiddleDown:
+                {
                     EnsureMinimumGap(lastSendAtMs, MinPreClickSettleMs, sw, token);
+                    var (nx, ny) = VirtualDesktop.ToNormalized(ev.X, ev.Y);
+                    SendPrimingTap(nx, ny, ev.Kind);
+                    lastSendAtMs = sw.Elapsed.TotalMilliseconds;
+                    EnsureMinimumGap(lastSendAtMs, PrimingToRealClickGapMs, sw, token);
                     break;
+                }
                 case MouseEventKind.LeftUp:
                     EnsureMinimumGap(leftDownAtMs ?? 0, MinClickHoldMs, sw, token);
                     leftDownAtMs = null;
@@ -170,6 +187,31 @@ public sealed class Player
                 case MouseEventKind.MiddleDown: middleDownAtMs = lastSendAtMs; break;
             }
         }
+    }
+
+    /// <summary>
+    /// Sends a quick, self-contained down+up on the given button before the "real" recorded click,
+    /// mimicking a fast double-click. Empirically, some web apps silently swallow a single
+    /// programmatic click (hover/active states still fire, but the app's own click handler never
+    /// runs) while a rapid double-tap reliably gets through — this reproduces that without changing
+    /// what actually gets recorded. Always completes its own down+up (ignores cancellation) so a
+    /// button can never get left stuck down if F9 is pressed mid-tap.
+    /// </summary>
+    private static void SendPrimingTap(int nx, int ny, MouseEventKind downKind)
+    {
+        var (downFlag, upFlag) = downKind switch
+        {
+            MouseEventKind.LeftDown => (Native.MOUSEEVENTF_LEFTDOWN, Native.MOUSEEVENTF_LEFTUP),
+            MouseEventKind.RightDown => (Native.MOUSEEVENTF_RIGHTDOWN, Native.MOUSEEVENTF_RIGHTUP),
+            MouseEventKind.MiddleDown => (Native.MOUSEEVENTF_MIDDLEDOWN, Native.MOUSEEVENTF_MIDDLEUP),
+            _ => (0u, 0u)
+        };
+        if (downFlag == 0) return;
+
+        SendMouseInput(nx, ny, Native.MOUSEEVENTF_MOVE | Native.MOUSEEVENTF_ABSOLUTE | Native.MOUSEEVENTF_VIRTUALDESK, 0);
+        SendMouseInput(0, 0, downFlag, 0);
+        Thread.Sleep(PrimingTapHoldMs);
+        SendMouseInput(0, 0, upFlag, 0);
     }
 
     /// <summary>Blocks until at least <paramref name="minGapMs"/> has passed since <paramref name="sinceMs"/>.</summary>
