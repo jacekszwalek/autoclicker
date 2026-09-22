@@ -31,17 +31,6 @@ public sealed class Player
     private const int MinMoveStepMs = 8;
 
     /// <summary>
-    /// How long the extra "priming tap" (see below) stays down before its own release.
-    /// </summary>
-    private const int PrimingTapHoldMs = 30;
-
-    /// <summary>
-    /// Real (wall-clock) gap between the priming tap's release and the actual recorded button-down
-    /// that follows it.
-    /// </summary>
-    private const double PrimingToRealClickGapMs = 60.0;
-
-    /// <summary>
     /// Real time to wait after the very last input event before handing focus back to our own
     /// window. SendInput only queues the OS input message; if MainForm reactivates itself
     /// (Activate/BringToFront) before the target app has actually dequeued and processed the final
@@ -151,14 +140,8 @@ public sealed class Player
                 case MouseEventKind.LeftDown:
                 case MouseEventKind.RightDown:
                 case MouseEventKind.MiddleDown:
-                {
                     EnsureMinimumGap(lastSendAtMs, MinPreClickSettleMs, sw, token);
-                    var (nx, ny) = VirtualDesktop.ToNormalized(ev.X, ev.Y);
-                    SendPrimingTap(nx, ny, ev.Kind);
-                    lastSendAtMs = sw.Elapsed.TotalMilliseconds;
-                    EnsureMinimumGap(lastSendAtMs, PrimingToRealClickGapMs, sw, token);
                     break;
-                }
                 case MouseEventKind.LeftUp:
                     EnsureMinimumGap(leftDownAtMs ?? 0, MinClickHoldMs, sw, token);
                     leftDownAtMs = null;
@@ -187,31 +170,6 @@ public sealed class Player
                 case MouseEventKind.MiddleDown: middleDownAtMs = lastSendAtMs; break;
             }
         }
-    }
-
-    /// <summary>
-    /// Sends a quick, self-contained down+up on the given button before the "real" recorded click,
-    /// mimicking a fast double-click. Empirically, some web apps silently swallow a single
-    /// programmatic click (hover/active states still fire, but the app's own click handler never
-    /// runs) while a rapid double-tap reliably gets through — this reproduces that without changing
-    /// what actually gets recorded. Always completes its own down+up (ignores cancellation) so a
-    /// button can never get left stuck down if F9 is pressed mid-tap.
-    /// </summary>
-    private static void SendPrimingTap(int nx, int ny, MouseEventKind downKind)
-    {
-        var (downFlag, upFlag) = downKind switch
-        {
-            MouseEventKind.LeftDown => (Native.MOUSEEVENTF_LEFTDOWN, Native.MOUSEEVENTF_LEFTUP),
-            MouseEventKind.RightDown => (Native.MOUSEEVENTF_RIGHTDOWN, Native.MOUSEEVENTF_RIGHTUP),
-            MouseEventKind.MiddleDown => (Native.MOUSEEVENTF_MIDDLEDOWN, Native.MOUSEEVENTF_MIDDLEUP),
-            _ => (0u, 0u)
-        };
-        if (downFlag == 0) return;
-
-        SendMouseInput(nx, ny, Native.MOUSEEVENTF_MOVE | Native.MOUSEEVENTF_ABSOLUTE | Native.MOUSEEVENTF_VIRTUALDESK, 0);
-        SendMouseInput(0, 0, downFlag, 0);
-        Thread.Sleep(PrimingTapHoldMs);
-        SendMouseInput(0, 0, upFlag, 0);
     }
 
     /// <summary>Blocks until at least <paramref name="minGapMs"/> has passed since <paramref name="sinceMs"/>.</summary>
