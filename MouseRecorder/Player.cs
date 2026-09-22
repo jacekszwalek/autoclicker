@@ -9,19 +9,20 @@ public sealed class Player
 {
     /// <summary>
     /// Minimum real (wall-clock) time a mouse button stays down before its release is sent, no matter
-    /// the playback speed. Some heavy, ad-laden pages occasionally stall their main JS thread for a
-    /// short moment (ad load/decode, GC pause); a longer hold gives the page more chances for one of
-    /// its later, still-alive frames to observe the button-down state and register the click, instead
-    /// of the whole press-and-release happening to fall entirely within a stalled window.
+    /// the playback speed. Kept short and close to a natural click: on pages that occasionally stall
+    /// their main JS thread for a short moment, a LONGER click window is actually worse, not better —
+    /// it just gives the random stall more real time in which to overlap the click. A short click plus
+    /// a fast priming tap beforehand (see below) gives the page two brief, independent chances instead
+    /// of one long one.
     /// </summary>
-    private const double MinClickHoldMs = 500.0;
+    private const double MinClickHoldMs = 50.0;
 
     /// <summary>
     /// Minimum real (wall-clock) time since the last SendInput call before a button-down is sent.
-    /// Gives the target app's hit-testing/hover state a moment to catch up with the cursor's new
-    /// position before the click starts, instead of pressing the instant the cursor arrives.
+    /// Kept small for the same reason as MinClickHoldMs — a long artificial settle only widens the
+    /// window in which a page's own random stall can overlap the click.
     /// </summary>
-    private const double MinPreClickSettleMs = 200.0;
+    private const double MinPreClickSettleMs = 10.0;
 
     /// <summary>
     /// Minimum real (wall-clock) spacing between successive SendInput calls during interpolated
@@ -31,6 +32,17 @@ public sealed class Player
     /// cause of clicks being dropped or misrouted intermittently at higher speeds.
     /// </summary>
     private const int MinMoveStepMs = 8;
+
+    /// <summary>
+    /// How long the priming tap (see SendPrimingTap) stays down before its own release.
+    /// </summary>
+    private const int PrimingTapHoldMs = 30;
+
+    /// <summary>
+    /// Real (wall-clock) gap between the priming tap's release and the actual recorded button-down
+    /// that follows it — short and natural, like a fast human double-click.
+    /// </summary>
+    private const double PrimingToRealClickGapMs = 50.0;
 
     /// <summary>
     /// Real time to wait after the very last input event before handing focus back to our own
@@ -142,8 +154,14 @@ public sealed class Player
                 case MouseEventKind.LeftDown:
                 case MouseEventKind.RightDown:
                 case MouseEventKind.MiddleDown:
+                {
                     EnsureMinimumGap(lastSendAtMs, MinPreClickSettleMs, sw, token);
+                    var (nx, ny) = VirtualDesktop.ToNormalized(ev.X, ev.Y);
+                    SendPrimingTap(nx, ny, ev.Kind);
+                    lastSendAtMs = sw.Elapsed.TotalMilliseconds;
+                    EnsureMinimumGap(lastSendAtMs, PrimingToRealClickGapMs, sw, token);
                     break;
+                }
                 case MouseEventKind.LeftUp:
                     EnsureMinimumGap(leftDownAtMs ?? 0, MinClickHoldMs, sw, token);
                     leftDownAtMs = null;
@@ -172,6 +190,31 @@ public sealed class Player
                 case MouseEventKind.MiddleDown: middleDownAtMs = lastSendAtMs; break;
             }
         }
+    }
+
+    /// <summary>
+    /// Sends a quick, self-contained down+up on the given button before the "real" recorded click.
+    /// Empirically confirmed reliable on at least one heavy, ad-laden page that occasionally drops a
+    /// single click: two brief, independent attempts a natural double-click's gap apart give the page
+    /// two separate chances to catch the input, rather than one longer one that's just as exposed to
+    /// the page's own random stalls. Always completes its own down+up (ignores cancellation) so a
+    /// button can never get left stuck down if F9 is pressed mid-tap.
+    /// </summary>
+    private static void SendPrimingTap(int nx, int ny, MouseEventKind downKind)
+    {
+        var (downFlag, upFlag) = downKind switch
+        {
+            MouseEventKind.LeftDown => (Native.MOUSEEVENTF_LEFTDOWN, Native.MOUSEEVENTF_LEFTUP),
+            MouseEventKind.RightDown => (Native.MOUSEEVENTF_RIGHTDOWN, Native.MOUSEEVENTF_RIGHTUP),
+            MouseEventKind.MiddleDown => (Native.MOUSEEVENTF_MIDDLEDOWN, Native.MOUSEEVENTF_MIDDLEUP),
+            _ => (0u, 0u)
+        };
+        if (downFlag == 0) return;
+
+        const uint moveFlags = Native.MOUSEEVENTF_MOVE | Native.MOUSEEVENTF_ABSOLUTE | Native.MOUSEEVENTF_VIRTUALDESK;
+        SendMouseInput(nx, ny, moveFlags | downFlag, 0);
+        Thread.Sleep(PrimingTapHoldMs);
+        SendMouseInput(nx, ny, moveFlags | upFlag, 0);
     }
 
     /// <summary>Blocks until at least <paramref name="minGapMs"/> has passed since <paramref name="sinceMs"/>.</summary>
