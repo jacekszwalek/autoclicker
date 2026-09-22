@@ -9,10 +9,12 @@ public sealed class Player
 {
     /// <summary>
     /// Minimum real (wall-clock) time a mouse button stays down before its release is sent, no matter
-    /// the playback speed. At high speed dividers a click's down/up gap can shrink to just a few ms,
-    /// which some apps (browsers in particular) fail to register as a real click.
+    /// the playback speed. Some heavy, ad-laden pages occasionally stall their main JS thread for a
+    /// short moment (ad load/decode, GC pause); a longer hold gives the page more chances for one of
+    /// its later, still-alive frames to observe the button-down state and register the click, instead
+    /// of the whole press-and-release happening to fall entirely within a stalled window.
     /// </summary>
-    private const double MinClickHoldMs = 200.0;
+    private const double MinClickHoldMs = 500.0;
 
     /// <summary>
     /// Minimum real (wall-clock) time since the last SendInput call before a button-down is sent.
