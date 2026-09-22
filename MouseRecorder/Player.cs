@@ -15,6 +15,22 @@ public sealed class Player
     private const double MinClickHoldMs = 40.0;
 
     /// <summary>
+    /// Minimum real (wall-clock) time since the last SendInput call before a button-down is sent.
+    /// Gives the target app's hit-testing/hover state a moment to catch up with the cursor's new
+    /// position before the click starts, instead of pressing the instant the cursor arrives.
+    /// </summary>
+    private const double MinPreClickSettleMs = 15.0;
+
+    /// <summary>
+    /// Minimum real (wall-clock) spacing between successive SendInput calls during interpolated
+    /// movement, regardless of playback speed. Without this floor, a fast movement segment played
+    /// back at high speed (e.g. x10) sends the same number of move events in a tenth of the time —
+    /// flooding the target app's input queue far faster than it can keep up, which is the likely
+    /// cause of clicks being dropped or misrouted intermittently at higher speeds.
+    /// </summary>
+    private const int MinMoveStepMs = 8;
+
+    /// <summary>
     /// Real time to wait after the very last input event before handing focus back to our own
     /// window. SendInput only queues the OS input message; if MainForm reactivates itself
     /// (Activate/BringToFront) before the target app has actually dequeued and processed the final
@@ -98,6 +114,7 @@ public sealed class Player
         var sw = Stopwatch.StartNew();
         Point currentPos = recording.StartPosition;
         long currentTimeMs = 0;
+        double lastSendAtMs = 0;
 
         double? leftDownAtMs = null;
         double? rightDownAtMs = null;
@@ -109,7 +126,7 @@ public sealed class Player
 
             if (ev.Kind == MouseEventKind.Move)
             {
-                InterpolateMove(currentPos, new Point(ev.X, ev.Y), currentTimeMs, ev.TimestampMs, speedDivisor, sw, token);
+                InterpolateMove(currentPos, new Point(ev.X, ev.Y), currentTimeMs, ev.TimestampMs, speedDivisor, sw, token, ref lastSendAtMs);
                 currentPos = new Point(ev.X, ev.Y);
                 currentTimeMs = ev.TimestampMs;
                 continue;
@@ -120,16 +137,21 @@ public sealed class Player
 
             switch (ev.Kind)
             {
+                case MouseEventKind.LeftDown:
+                case MouseEventKind.RightDown:
+                case MouseEventKind.MiddleDown:
+                    EnsureMinimumGap(lastSendAtMs, MinPreClickSettleMs, sw, token);
+                    break;
                 case MouseEventKind.LeftUp:
-                    EnsureMinimumHold(leftDownAtMs, sw, token);
+                    EnsureMinimumGap(leftDownAtMs ?? 0, MinClickHoldMs, sw, token);
                     leftDownAtMs = null;
                     break;
                 case MouseEventKind.RightUp:
-                    EnsureMinimumHold(rightDownAtMs, sw, token);
+                    EnsureMinimumGap(rightDownAtMs ?? 0, MinClickHoldMs, sw, token);
                     rightDownAtMs = null;
                     break;
                 case MouseEventKind.MiddleUp:
-                    EnsureMinimumHold(middleDownAtMs, sw, token);
+                    EnsureMinimumGap(middleDownAtMs ?? 0, MinClickHoldMs, sw, token);
                     middleDownAtMs = null;
                     break;
             }
@@ -138,44 +160,46 @@ public sealed class Player
             SendEvent(ev, pressed);
             currentPos = new Point(ev.X, ev.Y);
             currentTimeMs = ev.TimestampMs;
+            lastSendAtMs = sw.Elapsed.TotalMilliseconds;
             Progress.SetPosition(ev.X, ev.Y);
 
             switch (ev.Kind)
             {
-                case MouseEventKind.LeftDown: leftDownAtMs = sw.Elapsed.TotalMilliseconds; break;
-                case MouseEventKind.RightDown: rightDownAtMs = sw.Elapsed.TotalMilliseconds; break;
-                case MouseEventKind.MiddleDown: middleDownAtMs = sw.Elapsed.TotalMilliseconds; break;
+                case MouseEventKind.LeftDown: leftDownAtMs = lastSendAtMs; break;
+                case MouseEventKind.RightDown: rightDownAtMs = lastSendAtMs; break;
+                case MouseEventKind.MiddleDown: middleDownAtMs = lastSendAtMs; break;
             }
         }
     }
 
-    /// <summary>Blocks until at least MinClickHoldMs has passed since the matching button-down was sent.</summary>
-    private static void EnsureMinimumHold(double? downAtMs, Stopwatch sw, CancellationToken token)
+    /// <summary>Blocks until at least <paramref name="minGapMs"/> has passed since <paramref name="sinceMs"/>.</summary>
+    private static void EnsureMinimumGap(double sinceMs, double minGapMs, Stopwatch sw, CancellationToken token)
     {
-        if (downAtMs is not { } downAt) return;
-
-        double heldFor = sw.Elapsed.TotalMilliseconds - downAt;
-        if (heldFor < MinClickHoldMs)
+        double elapsed = sw.Elapsed.TotalMilliseconds - sinceMs;
+        if (elapsed < minGapMs)
         {
-            WaitUntil(downAt + MinClickHoldMs, sw, token);
+            WaitUntil(sinceMs + minGapMs, sw, token);
         }
     }
 
-    private void InterpolateMove(Point from, Point to, long fromMs, long toMs, int speedDivisor, Stopwatch sw, CancellationToken token)
+    private void InterpolateMove(Point from, Point to, long fromMs, long toMs, int speedDivisor, Stopwatch sw, CancellationToken token, ref double lastSendAtMs)
     {
-        const int stepMs = 8;
         long duration = toMs - fromMs;
+        double wallClockDuration = duration / (double)speedDivisor;
 
-        if (duration <= 0)
+        if (duration <= 0 || wallClockDuration < MinMoveStepMs)
         {
             WaitUntil(toMs / (double)speedDivisor, sw, token);
             if (token.IsCancellationRequested) return;
             SendMove(to);
+            lastSendAtMs = sw.Elapsed.TotalMilliseconds;
             Progress.SetPosition(to.X, to.Y);
             return;
         }
 
-        int steps = Math.Max(1, (int)(duration / stepMs));
+        // Cap the number of steps so successive SendInput calls stay at least MinMoveStepMs apart in
+        // real time, no matter how much this segment gets compressed by the speed divisor.
+        int steps = Math.Max(1, (int)(wallClockDuration / MinMoveStepMs));
         for (int i = 1; i <= steps; i++)
         {
             if (token.IsCancellationRequested) return;
@@ -189,6 +213,7 @@ public sealed class Player
             if (token.IsCancellationRequested) return;
 
             SendMove(new Point(x, y));
+            lastSendAtMs = sw.Elapsed.TotalMilliseconds;
             Progress.SetPosition(x, y);
         }
     }
@@ -211,42 +236,48 @@ public sealed class Player
         SendMouseInput(nx, ny, Native.MOUSEEVENTF_MOVE | Native.MOUSEEVENTF_ABSOLUTE | Native.MOUSEEVENTF_VIRTUALDESK, 0);
     }
 
+    /// <summary>
+    /// Sends the cursor position and the button/wheel action as two separate SendInput calls instead
+    /// of one combined move+button packet — matching how a real mouse driver reports them (a stream of
+    /// move deltas, then a distinct button report) and avoiding any target-app quirks around merged
+    /// move+click input.
+    /// </summary>
     private static void SendEvent(RecordedEvent ev, HashSet<MouseEventKind> pressed)
     {
         var (nx, ny) = VirtualDesktop.ToNormalized(ev.X, ev.Y);
-        const uint baseFlags = Native.MOUSEEVENTF_MOVE | Native.MOUSEEVENTF_ABSOLUTE | Native.MOUSEEVENTF_VIRTUALDESK;
+        SendMouseInput(nx, ny, Native.MOUSEEVENTF_MOVE | Native.MOUSEEVENTF_ABSOLUTE | Native.MOUSEEVENTF_VIRTUALDESK, 0);
 
         switch (ev.Kind)
         {
             case MouseEventKind.LeftDown:
-                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_LEFTDOWN, 0);
+                SendMouseInput(0, 0, Native.MOUSEEVENTF_LEFTDOWN, 0);
                 pressed.Add(MouseEventKind.LeftDown);
                 break;
             case MouseEventKind.LeftUp:
-                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_LEFTUP, 0);
+                SendMouseInput(0, 0, Native.MOUSEEVENTF_LEFTUP, 0);
                 pressed.Remove(MouseEventKind.LeftDown);
                 break;
             case MouseEventKind.RightDown:
-                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_RIGHTDOWN, 0);
+                SendMouseInput(0, 0, Native.MOUSEEVENTF_RIGHTDOWN, 0);
                 pressed.Add(MouseEventKind.RightDown);
                 break;
             case MouseEventKind.RightUp:
-                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_RIGHTUP, 0);
+                SendMouseInput(0, 0, Native.MOUSEEVENTF_RIGHTUP, 0);
                 pressed.Remove(MouseEventKind.RightDown);
                 break;
             case MouseEventKind.MiddleDown:
-                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_MIDDLEDOWN, 0);
+                SendMouseInput(0, 0, Native.MOUSEEVENTF_MIDDLEDOWN, 0);
                 pressed.Add(MouseEventKind.MiddleDown);
                 break;
             case MouseEventKind.MiddleUp:
-                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_MIDDLEUP, 0);
+                SendMouseInput(0, 0, Native.MOUSEEVENTF_MIDDLEUP, 0);
                 pressed.Remove(MouseEventKind.MiddleDown);
                 break;
             case MouseEventKind.WheelVertical:
-                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_WHEEL, ev.Delta);
+                SendMouseInput(0, 0, Native.MOUSEEVENTF_WHEEL, ev.Delta);
                 break;
             case MouseEventKind.WheelHorizontal:
-                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_HWHEEL, ev.Delta);
+                SendMouseInput(0, 0, Native.MOUSEEVENTF_HWHEEL, ev.Delta);
                 break;
         }
     }
