@@ -237,47 +237,49 @@ public sealed class Player
     }
 
     /// <summary>
-    /// Sends the cursor position and the button/wheel action as two separate SendInput calls instead
-    /// of one combined move+button packet — matching how a real mouse driver reports them (a stream of
-    /// move deltas, then a distinct button report) and avoiding any target-app quirks around merged
-    /// move+click input.
+    /// Sends the cursor position and the button/wheel action in a single, atomic SendInput packet.
+    /// A real mouse always reports position together with the button state on every hardware report,
+    /// so a click's coordinates are never separated from the click itself; some pages/games that read
+    /// clientX/clientY straight off the mousedown/mouseup event (rather than tracking a continuously
+    /// updated cursor position from mousemove) can otherwise see a click with stale or missing
+    /// coordinates if position and button state arrive as two separate injected events.
     /// </summary>
     private static void SendEvent(RecordedEvent ev, HashSet<MouseEventKind> pressed)
     {
         var (nx, ny) = VirtualDesktop.ToNormalized(ev.X, ev.Y);
-        SendMouseInput(nx, ny, Native.MOUSEEVENTF_MOVE | Native.MOUSEEVENTF_ABSOLUTE | Native.MOUSEEVENTF_VIRTUALDESK, 0);
+        const uint baseFlags = Native.MOUSEEVENTF_MOVE | Native.MOUSEEVENTF_ABSOLUTE | Native.MOUSEEVENTF_VIRTUALDESK;
 
         switch (ev.Kind)
         {
             case MouseEventKind.LeftDown:
-                SendMouseInput(0, 0, Native.MOUSEEVENTF_LEFTDOWN, 0);
+                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_LEFTDOWN, 0);
                 pressed.Add(MouseEventKind.LeftDown);
                 break;
             case MouseEventKind.LeftUp:
-                SendMouseInput(0, 0, Native.MOUSEEVENTF_LEFTUP, 0);
+                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_LEFTUP, 0);
                 pressed.Remove(MouseEventKind.LeftDown);
                 break;
             case MouseEventKind.RightDown:
-                SendMouseInput(0, 0, Native.MOUSEEVENTF_RIGHTDOWN, 0);
+                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_RIGHTDOWN, 0);
                 pressed.Add(MouseEventKind.RightDown);
                 break;
             case MouseEventKind.RightUp:
-                SendMouseInput(0, 0, Native.MOUSEEVENTF_RIGHTUP, 0);
+                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_RIGHTUP, 0);
                 pressed.Remove(MouseEventKind.RightDown);
                 break;
             case MouseEventKind.MiddleDown:
-                SendMouseInput(0, 0, Native.MOUSEEVENTF_MIDDLEDOWN, 0);
+                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_MIDDLEDOWN, 0);
                 pressed.Add(MouseEventKind.MiddleDown);
                 break;
             case MouseEventKind.MiddleUp:
-                SendMouseInput(0, 0, Native.MOUSEEVENTF_MIDDLEUP, 0);
+                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_MIDDLEUP, 0);
                 pressed.Remove(MouseEventKind.MiddleDown);
                 break;
             case MouseEventKind.WheelVertical:
-                SendMouseInput(0, 0, Native.MOUSEEVENTF_WHEEL, ev.Delta);
+                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_WHEEL, ev.Delta);
                 break;
             case MouseEventKind.WheelHorizontal:
-                SendMouseInput(0, 0, Native.MOUSEEVENTF_HWHEEL, ev.Delta);
+                SendMouseInput(nx, ny, baseFlags | Native.MOUSEEVENTF_HWHEEL, ev.Delta);
                 break;
         }
     }
