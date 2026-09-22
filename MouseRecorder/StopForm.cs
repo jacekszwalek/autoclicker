@@ -14,7 +14,7 @@ public sealed class StopForm : Form
         StartPosition = FormStartPosition.Manual;
         TopMost = true;
         ShowInTaskbar = false;
-        Size = new Size(30, 30);
+        Size = new Size(60, 60);
         BackColor = Color.Red;
 
         var primary = Screen.PrimaryScreen!.Bounds;
@@ -27,14 +27,12 @@ public sealed class StopForm : Form
             ForeColor = Color.White,
             BackColor = Color.Red,
             TextAlign = ContentAlignment.MiddleCenter,
-            Font = new Font("Segoe UI", 12f, FontStyle.Bold),
-            Cursor = Cursors.Hand
+            Font = new Font("Segoe UI", 24f, FontStyle.Bold)
         };
         label.Click += (_, _) => StopClicked?.Invoke(this, EventArgs.Empty);
         Controls.Add(label);
 
         Click += (_, _) => StopClicked?.Invoke(this, EventArgs.Empty);
-        Cursor = Cursors.Hand;
     }
 
     protected override bool ShowWithoutActivation => true;

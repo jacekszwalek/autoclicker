@@ -6,7 +6,7 @@ namespace MouseRecorder;
 /// <summary>Semi-transparent, fullscreen window with a large 3-2-1 countdown. Does not capture clicks.</summary>
 public sealed class CountdownForm : Form
 {
-    private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1000 };
+    private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1200 };
     private readonly Label _label;
     private int _remaining = 3;
 
