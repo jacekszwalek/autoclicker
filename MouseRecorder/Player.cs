@@ -7,6 +7,13 @@ namespace MouseRecorder;
 /// <summary>Replays recorded mouse events using SendInput, on a dedicated thread.</summary>
 public sealed class Player
 {
+    /// <summary>
+    /// Minimum real (wall-clock) time a mouse button stays down before its release is sent, no matter
+    /// the playback speed. At high speed dividers a click's down/up gap can shrink to just a few ms,
+    /// which some apps (browsers in particular) fail to register as a real click.
+    /// </summary>
+    private const double MinClickHoldMs = 40.0;
+
     public bool IsPlaying { get; private set; }
     public PlaybackProgress Progress { get; } = new();
 
@@ -77,6 +84,10 @@ public sealed class Player
         Point currentPos = recording.StartPosition;
         long currentTimeMs = 0;
 
+        double? leftDownAtMs = null;
+        double? rightDownAtMs = null;
+        double? middleDownAtMs = null;
+
         foreach (var ev in recording.Events)
         {
             if (token.IsCancellationRequested) return;
@@ -86,17 +97,52 @@ public sealed class Player
                 InterpolateMove(currentPos, new Point(ev.X, ev.Y), currentTimeMs, ev.TimestampMs, speedDivisor, sw, token);
                 currentPos = new Point(ev.X, ev.Y);
                 currentTimeMs = ev.TimestampMs;
+                continue;
             }
-            else
-            {
-                WaitUntil(ev.TimestampMs / (double)speedDivisor, sw, token);
-                if (token.IsCancellationRequested) return;
 
-                SendEvent(ev, pressed);
-                currentPos = new Point(ev.X, ev.Y);
-                currentTimeMs = ev.TimestampMs;
-                Progress.SetPosition(ev.X, ev.Y);
+            WaitUntil(ev.TimestampMs / (double)speedDivisor, sw, token);
+            if (token.IsCancellationRequested) return;
+
+            switch (ev.Kind)
+            {
+                case MouseEventKind.LeftUp:
+                    EnsureMinimumHold(leftDownAtMs, sw, token);
+                    leftDownAtMs = null;
+                    break;
+                case MouseEventKind.RightUp:
+                    EnsureMinimumHold(rightDownAtMs, sw, token);
+                    rightDownAtMs = null;
+                    break;
+                case MouseEventKind.MiddleUp:
+                    EnsureMinimumHold(middleDownAtMs, sw, token);
+                    middleDownAtMs = null;
+                    break;
             }
+            if (token.IsCancellationRequested) return;
+
+            SendEvent(ev, pressed);
+            currentPos = new Point(ev.X, ev.Y);
+            currentTimeMs = ev.TimestampMs;
+            Progress.SetPosition(ev.X, ev.Y);
+
+            switch (ev.Kind)
+            {
+                case MouseEventKind.LeftDown: leftDownAtMs = sw.Elapsed.TotalMilliseconds; break;
+                case MouseEventKind.RightDown: rightDownAtMs = sw.Elapsed.TotalMilliseconds; break;
+                case MouseEventKind.MiddleDown: middleDownAtMs = sw.Elapsed.TotalMilliseconds; break;
+            }
+        }
+    }
+
+    /// <summary>Blocks until at least MinClickHoldMs has passed since the matching button-down was sent.</summary>
+    private static void EnsureMinimumHold(double? downAtMs, Stopwatch sw, CancellationToken token)
+    {
+        if (downAtMs is not { } downAt) return;
+
+        double heldFor = sw.Elapsed.TotalMilliseconds - downAt;
+        if (heldFor < MinClickHoldMs)
+        {
+            WaitUntil(downAt + MinClickHoldMs, sw, token);
         }
     }
 
