@@ -14,6 +14,16 @@ public sealed class Player
     /// </summary>
     private const double MinClickHoldMs = 40.0;
 
+    /// <summary>
+    /// Real time to wait after the very last input event before handing focus back to our own
+    /// window. SendInput only queues the OS input message; if MainForm reactivates itself
+    /// (Activate/BringToFront) before the target app has actually dequeued and processed the final
+    /// button-up, the target can lose the click that was in flight — most visible when the clicked
+    /// element sits right at the end of the recorded path, since nothing else delays the return to
+    /// MainForm in that case.
+    /// </summary>
+    private const int EndOfPlaybackSettleMs = 150;
+
     public bool IsPlaying { get; private set; }
     public PlaybackProgress Progress { get; } = new();
 
@@ -67,6 +77,11 @@ public sealed class Player
                     MoveTo(recording.StartPosition);
                     Progress.SetPosition(recording.StartPosition.X, recording.StartPosition.Y);
                 }
+            }
+
+            if (!token.IsCancellationRequested)
+            {
+                Thread.Sleep(EndOfPlaybackSettleMs);
             }
         }
         finally
